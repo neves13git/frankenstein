@@ -20,17 +20,25 @@ docs = [
 
 
 def mcp_get_tools():
-    """Busca a lista de ferramentas disponíveis no servidor MCP."""
+    """Busca a lista de ferramentas e seus schemas do MCP Server."""
     try:
         r = requests.get(f"{MCP_SERVER_URL}/tools")
         r.raise_for_status()
-        return r.json()["tools"]
-    except HTTPError as e:
-        print(f"[Agent] ERRO HTTP ao obter ferramentas: {e}")
-        return []
-    except requests.exceptions.RequestException as e:
-        print(f"[Agent] ERRO de Conexão ao obter ferramentas: {e}")
-        return []
+        tools = r.json()["tools"]
+        # Busca detalhes de cada tool
+        schemas = {}
+        for tool_name in tools:
+            # Supondo endpoint /tool_schema/{tool_name} retorna o schema da tool
+            try:
+                resp = requests.get(f"{MCP_SERVER_URL}/tool_schema/{tool_name}")
+                resp.raise_for_status()
+                schemas[tool_name] = resp.json()
+            except Exception:
+                schemas[tool_name] = None
+        return schemas
+    except Exception as e:
+        print(f"[Agent] ERRO ao obter schemas das ferramentas: {e}")
+        return {}
 
 
 def mcp_get_systems(client_id):
@@ -40,18 +48,16 @@ def mcp_get_systems(client_id):
     # Usar SYSTEM_SIMULATOR_URL para montar a URL base.
     url = f"{SYSTEM_SIMULATOR_URL}/api/v1/system1/{client_id}"
     try:
+        print(f"[Agent] GET sistemas: {url}")
         r = requests.get(url)
         r.raise_for_status()
-        
+        print(f"[Agent] Resposta sistemas: {r.text}")
         # Assume-se que o endpoint retorna uma LISTA de sistemas diretamente.
         return r.json()
-        
     except HTTPError as e:
-        # Captura o erro 500 ou qualquer outro erro HTTP
         print(f"[Agent] ERRO HTTP ao obter sistemas ({e.response.status_code}): {e}")
         return []
     except requests.exceptions.RequestException as e:
-        # Captura erros de rede (ex: servidor não está rodando)
         print(f"[Agent] ERRO de Conexão ao obter sistemas: {e}")
         return []
 
@@ -67,6 +73,7 @@ def mcp_execute_action(client_id, action, params):
             "arguments": params
         })
         r.raise_for_status()
+        print(f"[Agent] Resposta MCP Server: {r.text}")
         return r.json()
     except HTTPError as e:
         print(f"[Agent] ERRO HTTP ao executar ação ({e.response.status_code}): {e}")
@@ -98,41 +105,75 @@ def agent_run(json_input):
 
 
         # Só trata UM problema por ciclo
-        problema = problemas[0]
-        symptom_text = problema.get("error_message") or "sistema inativo"
-        hit = next((d for d in docs if d["symptom"] in symptom_text), None)
-        run_log.append({"step": "rag_search", "symptom": symptom_text, "hit": hit})
 
-        if not hit:
-            print(f"[Agent] Nenhum procedimento encontrado para sintoma: {symptom_text}")
-            break
+        run_log = []
+        max_cycles = 3
+        # Busca schemas das tools
+        tool_schemas = mcp_get_tools()
 
+        cycle = 0
+        while cycle < max_cycles:
+            print(f"[Agent] Diagnóstico ciclo {cycle+1}")
+            systems = mcp_get_systems(client_id)
+            print(f"[Agent] Sistemas recebidos: {systems}")
+            run_log.append({"step": "get_systems", "output": systems})
 
+            if not systems and cycle == 0:
+                print("[Agent] Não foi possível obter o estado inicial dos sistemas.")
+                return {"result": "service_unavailable", "log": run_log}
 
+            problemas = [s for s in systems if not s.get("is_active", True) or s.get("error_message")]
+            print(f"[Agent] Problemas detectados: {problemas}")
+            if not problemas:
+                print("[Agent] Nenhum problema encontrado.")
+                return {"result": "resolved", "log": run_log}
 
-        # Prepara parâmetros para o MCP Server
-        params = dict(hit["params"])  # base do procedimento
-        # Junta todos os campos do sistema problemático
-        system_fields = {k: v for k, v in problema.items() if k != "error_message"}
-        # Se houver id, passa como argumento de path
-        if "system_id" in system_fields:
-            params["system_id"] = str(system_fields["system_id"])
-        elif "id" in system_fields:
-            params["system_id"] = str(system_fields["id"])
-        # O corpo da requisição (body) deve conter os campos de atualização, exceto o id
-        body_fields = {k: v for k, v in system_fields.items() if k not in ["id", "system_id"]}
-        params["body"] = {**body_fields, **hit["params"]}
+            problema = problemas[0]
+            print(f"[Agent] Problema selecionado: {problema}")
+            symptom_text = problema.get("error_message") or "sistema inativo"
+            hit = next((d for d in docs if d["symptom"] in symptom_text), None)
+            print(f"[Agent] Procedimento encontrado: {hit}")
+            run_log.append({"step": "rag_search", "symptom": symptom_text, "hit": hit})
 
-        exec_out = mcp_execute_action(client_id, hit["action"], params)
-        run_log.append({"step": "execute", "action": hit["action"], "params": params, "output": exec_out})
+            if not hit:
+                print(f"[Agent] Nenhum procedimento encontrado para sintoma: {symptom_text}")
+                break
 
-        time.sleep(1)
-        cycle += 1
+            tool_schema = tool_schemas.get(hit["action"])
+            print(f"[Agent] Tool schema: {tool_schema}")
+            params = {}
+            if tool_schema and "inputSchema" in tool_schema:
+                input_schema = tool_schema["inputSchema"]
+                for field in input_schema.get("properties", {}):
+                    if field == "body":
+                        body_fields = {k: v for k, v in problema.items() if k not in ["error_message", "id", "system_id"]}
+                        params["body"] = {**body_fields, **hit["params"]}
+                    elif field in problema:
+                        params[field] = problema[field]
+                    elif field in hit["params"]:
+                        params[field] = hit["params"][field]
+            else:
+                system_fields = {k: v for k, v in problema.items() if k != "error_message"}
+                if "system_id" in system_fields:
+                    params["system_id"] = str(system_fields["system_id"])
+                elif "id" in system_fields:
+                    params["system_id"] = str(system_fields["id"])
+                body_fields = {k: v for k, v in system_fields.items() if k not in ["id", "system_id"]}
+                params["body"] = {**body_fields, **hit["params"]}
 
-    return {"result": "unresolved", "log": run_log}
+            print(f"[Agent] Parâmetros finais para execução: {params}")
+            exec_out = mcp_execute_action(client_id, hit["action"], params)
+            run_log.append({"step": "execute", "action": hit["action"], "params": params, "output": exec_out})
+
+            time.sleep(1)
+            cycle += 1
+
+        print(f"[Agent] Resultado final: {{'result': 'unresolved', 'log': run_log}}")
+        return {"result": "unresolved", "log": run_log}
+
 
 if __name__ == "__main__":
-    # Exemplo de entrada
+    print("[Agent] Script iniciado!")
     payload = {"client_id": CLIENT_ID}
     result = agent_run(payload)
     print("[Agent] Resultado final:", result)
