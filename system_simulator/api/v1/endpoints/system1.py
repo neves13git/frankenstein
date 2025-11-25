@@ -17,7 +17,17 @@ def get_system_by_id(system_id: int, db: Session = Depends(get_db)):
     return system
 
 # Endpoint para atualizar um sistema por id
-@router.put("/system1/id/{system_id}", response_model=System1Read)
+
+# Novo endpoint para PUT /api/v1/system1/{system_id}
+from fastapi import APIRouter, Body, Depends, HTTPException
+from sqlalchemy.orm import Session
+from models.system1 import System1
+from schemas.system1 import System1Read, System1Update
+from core.database import get_db
+
+router = APIRouter()
+
+@router.put("/system1/{system_id}", response_model=System1Read)
 def update_system_by_id(system_id: int, system_update: System1Update = Body(...), db: Session = Depends(get_db)):
     system = db.query(System1).filter(System1.id == system_id).first()
     if not system:

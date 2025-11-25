@@ -34,7 +34,7 @@ paths:
                           type: boolean
                         error_message:
                           type: string
-  /api/v1/system1/id/{system_id}:
+  /api/v1/system1/{system_id}:
     get:
       summary: Recupera um sistema do tipo 1 pelo seu id.
       operationId: get_system_by_id

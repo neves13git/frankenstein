@@ -14,8 +14,8 @@ CLIENT_ID = "1"
 
 # Mock base de procedimentos (simula RAG)
 docs = [
-    {"symptom": "erro de conexão", "procedure": "Reiniciar módulo de rede", "action": "restart_module", "params": {"module": "network"}},
-    {"symptom": "sistema inativo", "procedure": "Verificar alimentação elétrica", "action": "check_power", "params": {}},
+    {"symptom": "erro de conexão", "procedure": "Ativar sistema", "action": "update_system_by_id", "params": {"is_active": True}},
+    {"symptom": "sistema inativo", "procedure": "Ativar sistema", "action": "update_system_by_id", "params": {"is_active": True}},
 ]
 
 
@@ -81,34 +81,53 @@ def agent_run(json_input):
     run_log = []
     max_cycles = 3
 
-    for cycle in range(max_cycles):
+    cycle = 0
+    while cycle < max_cycles:
         print(f"[Agent] Diagnóstico ciclo {cycle+1}")
         systems = mcp_get_systems(client_id)
         run_log.append({"step": "get_systems", "output": systems})
 
         if not systems and cycle == 0:
-             print("[Agent] Não foi possível obter o estado inicial dos sistemas.")
-             return {"result": "service_unavailable", "log": run_log}
-        
+            print("[Agent] Não foi possível obter o estado inicial dos sistemas.")
+            return {"result": "service_unavailable", "log": run_log}
+
         problemas = [s for s in systems if not s.get("is_active", True) or s.get("error_message")]
         if not problemas:
             print("[Agent] Nenhum problema encontrado.")
             return {"result": "resolved", "log": run_log}
 
-        # Só busca procedimentos (RAG) se houver problemas
-        for problema in problemas:
-            symptom_text = problema.get("error_message") or "sistema inativo"
-            hit = next((d for d in docs if d["symptom"] in symptom_text), None)
-            run_log.append({"step": "rag_search", "symptom": symptom_text, "hit": hit})
 
-            if not hit:
-                print(f"[Agent] Nenhum procedimento encontrado para sintoma: {symptom_text}")
-                continue
+        # Só trata UM problema por ciclo
+        problema = problemas[0]
+        symptom_text = problema.get("error_message") or "sistema inativo"
+        hit = next((d for d in docs if d["symptom"] in symptom_text), None)
+        run_log.append({"step": "rag_search", "symptom": symptom_text, "hit": hit})
 
-            exec_out = mcp_execute_action(client_id, hit["action"], hit["params"])
-            run_log.append({"step": "execute", "action": hit["action"], "params": hit["params"], "output": exec_out})
+        if not hit:
+            print(f"[Agent] Nenhum procedimento encontrado para sintoma: {symptom_text}")
+            break
+
+
+
+
+        # Prepara parâmetros para o MCP Server
+        params = dict(hit["params"])  # base do procedimento
+        # Junta todos os campos do sistema problemático
+        system_fields = {k: v for k, v in problema.items() if k != "error_message"}
+        # Se houver id, passa como argumento de path
+        if "system_id" in system_fields:
+            params["system_id"] = str(system_fields["system_id"])
+        elif "id" in system_fields:
+            params["system_id"] = str(system_fields["id"])
+        # O corpo da requisição (body) deve conter os campos de atualização, exceto o id
+        body_fields = {k: v for k, v in system_fields.items() if k not in ["id", "system_id"]}
+        params["body"] = {**body_fields, **hit["params"]}
+
+        exec_out = mcp_execute_action(client_id, hit["action"], params)
+        run_log.append({"step": "execute", "action": hit["action"], "params": params, "output": exec_out})
 
         time.sleep(1)
+        cycle += 1
 
     return {"result": "unresolved", "log": run_log}
 
