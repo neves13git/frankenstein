@@ -1,0 +1,180 @@
+tools:
+  - name: get_client_systems
+    description: Lista todos os sistemas de um cliente pelo client_id.
+    input_schema:
+      type: object
+      properties:
+        client_id:
+          type: string
+          example: "1"
+      required: [client_id]
+    output_schema:
+      type: object
+      properties:
+        sistemas:
+          type: array
+          items:
+            type: object
+            properties:
+              id: {type: string}
+              typification: {type: string}
+              is_active: {type: boolean}
+              error_message: {type: string}
+    examples:
+      - input: {client_id: "1"}
+        output:
+          sistemas:
+            - id: "1"
+              typification: "internet"
+              is_active: true
+              error_message: ""
+            - id: "2"
+              typification: "tv"
+              is_active: true
+              error_message: ""
+  - name: get_system_by_id
+    description: Recupera um sistema do tipo 1 pelo seu id.
+    input_schema:
+      type: object
+      properties:
+        system_id:
+          type: string
+          example: "1"
+      required: [system_id]
+    output_schema:
+      type: object
+      properties:
+        id: {type: string}
+        client_id: {type: string}
+        typification: {type: string}
+        is_active: {type: boolean}
+        error_message: {type: string}
+    examples:
+      - input: {system_id: "1"}
+        output:
+          id: "1"
+          client_id: "1"
+          typification: "internet"
+          is_active: true
+          error_message: ""
+  - name: list_all_systems
+    description: Lista todos os sistemas do tipo 1 registados na base de dados.
+    input_schema:
+      type: object
+      properties: {}
+    output_schema:
+      type: array
+      items:
+        type: object
+        properties:
+          id: {type: string}
+          client_id: {type: string}
+          typification: {type: string}
+          is_active: {type: boolean}
+          error_message: {type: string}
+    examples:
+      - input: {}
+        output:
+          - id: "1"
+            client_id: "1"
+            typification: "internet"
+            is_active: true
+            error_message: ""
+          - id: "2"
+            client_id: "1"
+            typification: "tv"
+            is_active: true
+            error_message: ""
+  - name: create_system
+    description: Cria um novo sistema do tipo 1 para um cliente. O campo `id` é gerado automaticamente.
+    input_schema:
+      type: object
+      properties:
+        client_id:
+          type: string
+          example: "1"
+        typification:
+          type: string
+          example: "internet"
+        is_active:
+          type: boolean
+          example: true
+        error_message:
+          type: string
+          example: ""
+      required: [client_id, typification, is_active]
+    output_schema:
+      type: object
+      properties:
+        id: {type: string}
+        client_id: {type: string}
+        typification: {type: string}
+        is_active: {type: boolean}
+        error_message: {type: string}
+    examples:
+      - input:
+          client_id: "1"
+          typification: "internet"
+          is_active: true
+          error_message: ""
+        output:
+          id: "2"
+          client_id: "1"
+          typification: "tv"
+          is_active: true
+          error_message: ""
+  - name: update_system_by_id
+    description: Atualiza os dados de um sistema do tipo 1 pelo seu id.
+    input_schema:
+      type: object
+      properties:
+        system_id:
+          type: string
+          example: "1"
+        typification:
+          type: string
+          example: "internet"
+        is_active:
+          type: boolean
+          example: false
+        error_message:
+          type: string
+          example: "Erro de conexão"
+      required: [system_id]
+    output_schema:
+      type: object
+      properties:
+        id: {type: string}
+        client_id: {type: string}
+        typification: {type: string}
+        is_active: {type: boolean}
+        error_message: {type: string}
+    examples:
+      - input:
+          system_id: "1"
+          typification: "internet"
+          is_active: false
+          error_message: "Erro de conexão"
+        output:
+          id: "1"
+          client_id: "1"
+          typification: "internet"
+          is_active: false
+          error_message: "Erro de conexão"
+  - name: health_check
+    description: Verifica o estado da API do System Simulator.
+    input_schema:
+      type: object
+      properties: {}
+    output_schema:
+      type: object
+      properties:
+        status: {type: string}
+        service: {type: string}
+        version: {type: string}
+    examples:
+      - input: {}
+        output:
+          status: ok
+          service: FastAPI
+          version: v1
