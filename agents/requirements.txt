@@ -1,0 +1,6 @@
+requests
+# Para versão completa com LangGraph (opcional):
+# langchain-openai
+# langgraph
+# sentence-transformers
+
