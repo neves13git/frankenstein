@@ -5,9 +5,11 @@ import os
 import time
 from requests.exceptions import HTTPError 
 
+
+# URLs separadas para cada serviço
+SYSTEM_SIMULATOR_URL = "http://localhost:9000"
 MCP_SERVER_URL = "http://localhost:9100"
 CLIENT_ID = "1"
-
 
 
 # Mock base de procedimentos (simula RAG)
@@ -18,7 +20,7 @@ docs = [
 
 
 def mcp_get_tools():
-    # Esta função não foi a que falhou, mantida inalterada
+    """Busca a lista de ferramentas disponíveis no servidor MCP."""
     try:
         r = requests.get(f"{MCP_SERVER_URL}/tools")
         r.raise_for_status()
@@ -33,14 +35,15 @@ def mcp_get_tools():
 
 def mcp_get_systems(client_id):
     """
-    Busca o status dos sistemas do cliente. Tratamento para erros HTTP e de conexão.
+    Busca o status dos sistemas do cliente (System Simulator).
     """
-    url = f"http://localhost:9000/api/v1/system1/{client_id}"
+    # Usar SYSTEM_SIMULATOR_URL para montar a URL base.
+    url = f"{SYSTEM_SIMULATOR_URL}/api/v1/system1/{client_id}"
     try:
         r = requests.get(url)
         r.raise_for_status()
         
-        # CORRIGIDO: Assume-se que o endpoint retorna uma LISTA de sistemas diretamente.
+        # Assume-se que o endpoint retorna uma LISTA de sistemas diretamente.
         return r.json()
         
     except HTTPError as e:
@@ -53,17 +56,15 @@ def mcp_get_systems(client_id):
         return []
 
 
-
 def mcp_execute_action(client_id, action, params):
     """
-    Executa uma ação no MCP Server. Adicionado tratamento de erros.
+    Executa uma ação no MCP Server (Tool Executor).
     """
     print(f"[Agent] Solicitando ao MCP Server execução da ação: {action} com params: {params}")
     try:
-        r = requests.post(f"{MCP_SERVER_URL}/execute", json={
-            "client_id": client_id,
-            "action": action,
-            "params": params
+        r = requests.post(f"{MCP_SERVER_URL}/call_tool", json={
+            "name": action,
+            "arguments": params
         })
         r.raise_for_status()
         return r.json()
@@ -94,9 +95,9 @@ def agent_run(json_input):
             print("[Agent] Nenhum problema encontrado.")
             return {"result": "resolved", "log": run_log}
 
+        # Só busca procedimentos (RAG) se houver problemas
         for problema in problemas:
             symptom_text = problema.get("error_message") or "sistema inativo"
-            # Simula busca de procedimento (RAG mock)
             hit = next((d for d in docs if d["symptom"] in symptom_text), None)
             run_log.append({"step": "rag_search", "symptom": symptom_text, "hit": hit})
 
