@@ -1,0 +1,182 @@
+openapi: 3.0.0
+info:
+  title: System Simulator API
+  version: 1.0.0
+paths:
+  /api/v1/system1/{client_id}:
+    get:
+      summary: Lista todos os sistemas de um cliente pelo client_id.
+      operationId: get_client_systems
+      parameters:
+        - name: client_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Lista de sistemas do cliente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sistemas:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        typification:
+                          type: string
+                        is_active:
+                          type: boolean
+                        error_message:
+                          type: string
+  /api/v1/system1/id/{system_id}:
+    get:
+      summary: Recupera um sistema do tipo 1 pelo seu id.
+      operationId: get_system_by_id
+      parameters:
+        - name: system_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Sistema encontrado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  client_id:
+                    type: string
+                  typification:
+                    type: string
+                  is_active:
+                    type: boolean
+                  error_message:
+                    type: string
+    put:
+      summary: Atualiza os dados de um sistema do tipo 1 pelo seu id.
+      operationId: update_system_by_id
+      parameters:
+        - name: system_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                typification:
+                  type: string
+                is_active:
+                  type: boolean
+                error_message:
+                  type: string
+      responses:
+        '200':
+          description: Sistema atualizado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  client_id:
+                    type: string
+                  typification:
+                    type: string
+                  is_active:
+                    type: boolean
+                  error_message:
+                    type: string
+  /api/v1/system1:
+    get:
+      summary: Lista todos os sistemas do tipo 1 registados na base de dados.
+      operationId: list_all_systems
+      responses:
+        '200':
+          description: Lista de sistemas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    client_id:
+                      type: string
+                    typification:
+                      type: string
+                    is_active:
+                      type: boolean
+                    error_message:
+                      type: string
+    post:
+      summary: Cria um novo sistema do tipo 1 para um cliente.
+      operationId: create_system
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                client_id:
+                  type: string
+                typification:
+                  type: string
+                is_active:
+                  type: boolean
+                error_message:
+                  type: string
+      responses:
+        '200':
+          description: Sistema criado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  client_id:
+                    type: string
+                  typification:
+                    type: string
+                  is_active:
+                    type: boolean
+                  error_message:
+                    type: string
+  /api/v1/health:
+    get:
+      summary: Verifica o estado da API do System Simulator.
+      operationId: health_check
+      responses:
+        '200':
+          description: Estado da API
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  service:
+                    type: string
+                  version:
+                    type: string

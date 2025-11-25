@@ -1,0 +1,60 @@
+# Exemplo de YAML Customizado para Ferramentas
+# Este formato permite definir ferramentas que não são APIs REST padrão
+
+tools:
+  - name: calcular_estatisticas
+    description: Calcula estatísticas de um conjunto de dados
+    input_schema:
+      type: object
+      properties:
+        dados:
+          type: array
+          items:
+            type: number
+          description: Lista de números para calcular estatísticas
+      required: [dados]
+    output_schema:
+      type: object
+      properties:
+        media:
+          type: number
+        mediana:
+          type: number
+        desvio_padrao:
+          type: number
+    # Exemplo de uso com URL HTTP
+    url: http://localhost:9000/api/v1/statistics
+    method: POST
+    examples:
+      - input:
+          dados: [1, 2, 3, 4, 5]
+        output:
+          media: 3.0
+          mediana: 3.0
+          desvio_padrao: 1.41
+
+  - name: validar_cpf
+    description: Valida se um CPF é válido
+    input_schema:
+      type: object
+      properties:
+        cpf:
+          type: string
+          description: CPF a ser validado (formato: 000.000.000-00)
+      required: [cpf]
+    output_schema:
+      type: object
+      properties:
+        valido:
+          type: boolean
+        mensagem:
+          type: string
+    url: http://localhost:9000/api/v1/validate/cpf
+    method: POST
+    examples:
+      - input:
+          cpf: "123.456.789-00"
+        output:
+          valido: false
+          mensagem: "CPF inválido"
+
